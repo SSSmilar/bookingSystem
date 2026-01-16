@@ -159,6 +159,7 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	var req models.Booking
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Error decoding request", http.StatusBadRequest)
+		return
 	}
 	tx, err := h.DB.Begin(context.Background())
 	if err != nil {
