@@ -1,4 +1,4 @@
-package main
+package models
 
 import "time"
 
@@ -20,7 +20,7 @@ type Booking struct {
 	ID        int64     `json:"id"`
 	RoomID    int64     `json:"roomId"`
 	UserID    int64     `json:"userId"`
-	Titel     string    `json:"title"`
+	Title     string    `json:"title"`
 	StartTime time.Time `json:"startTime"`
 	EndTime   time.Time `json:"endTime"`
 }

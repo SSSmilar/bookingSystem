@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bookingSystem/internal/handlers"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,29 +27,29 @@ func main() {
 	}
 	log.Println("Connected to database PostgreSQL")
 
+	myHandler := handlers.New(db)
+
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/rooms", GetRooms)
+	mux.HandleFunc("GET /api/rooms", myHandler.GetRooms)
+	mux.HandleFunc("POST /api/register", myHandler.Register)
+	mux.HandleFunc("POST /api/login", myHandler.Login)
+	handler := CorsMiddleware(mux)
+	log.Println("Server started on port 8080")
+	if err := http.ListenAndServe(":8080", handler); err != nil {
+		log.Fatal(err)
+	}
 }
-func GetRooms(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(context.Background(), "SELECT id , name , capacity ,  description FROM rooms")
-	if err != nil {
-		http.Error(w, "Error DataBase", http.StatusInternalServerError)
-		log.Println(err)
-		return
-	}
-	defer rows.Close()
-	var roms []Room
-	for rows.Next() {
-		var r Room
-		if err := rows.Scan(&r.ID, &r.Name, &r.Capacity, &r.Description); err != nil {
-			log.Println(err)
-			continue
+func CorsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", " Content-Type,  Authorization")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
 		}
-		roms = append(roms, r)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(roms); err != nil {
-		log.Println(err)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
