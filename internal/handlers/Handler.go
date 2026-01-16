@@ -130,3 +130,71 @@ func (h *Handler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r.WithContext(ctx))
 	}
 }
+func (h *Handler) GetBookings(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.DB.Query(context.Background(), "SELECT id , room_id , user_id , title, start_time , end_time FROM bookings")
+	if err != nil {
+		http.Error(w, "DB Error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var bookings []models.Booking
+	for rows.Next() {
+		var b models.Booking
+		if err := rows.Scan(&b.ID, &b.RoomID, &b.UserID, &b.Title, &b.StartTime, &b.EndTime); err != nil {
+			continue
+		}
+		bookings = append(bookings, b)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(bookings); err != nil {
+		log.Println("Error encoding response ", err)
+	}
+}
+func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
+	userId, ok := r.Context().Value("user_id").(int64)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req models.Booking
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Error decoding request", http.StatusBadRequest)
+	}
+	tx, err := h.DB.Begin(context.Background())
+	if err != nil {
+		http.Error(w, "Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(context.Background())
+	var dummy int64
+	if err := tx.QueryRow(context.Background(),
+		"SELECT 1 FROM  rooms WHERE id = $1 FOR  UPDATE ", req.RoomID).Scan(&dummy); err != nil {
+		http.Error(w, "Room not found", http.StatusNotFound)
+		return
+	}
+	var count int64
+	err = tx.QueryRow(context.Background(),
+		"SELECT COUNT(*) FROM  bookings  WHERE  room_id  = $1  AND (start_time < $3 AND end_time > $2)",
+		req.RoomID, req.StartTime, req.EndTime).Scan(&count)
+	if count > 0 {
+		http.Error(w, "Time alredy  Blooked! ", http.StatusConflict)
+		return
+	}
+	if _, err := tx.Exec(context.Background(),
+		"INSERT INTO bookings (room_id, user_id, title, start_time, end_time) \n\t\tVALUES ($1, $2, $3, $4, $5)",
+		req.RoomID, userId, req.Title, req.StartTime, req.EndTime); err != nil {
+		log.Println("Insert error:", err)
+		http.Error(w, "Failed to book", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(context.Background()); err != nil {
+		http.Error(w, "Fialed to commit transaction", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"status": "Booked!",
+	}); err != nil {
+		log.Println("Error encoding response ", err)
+	}
+}

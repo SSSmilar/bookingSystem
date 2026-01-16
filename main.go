@@ -34,6 +34,8 @@ func main() {
 	mux.HandleFunc("GET /api/rooms", myHandler.GetRooms)
 	mux.HandleFunc("POST /api/register", myHandler.Register)
 	mux.HandleFunc("POST /api/login", myHandler.Login)
+	mux.HandleFunc("GET /api/bookings", myHandler.GetBookings)
+	mux.HandleFunc("POST /api/bookings", myHandler.AuthMiddleware(myHandler.CreateBooking))
 	handler := CorsMiddleware(mux)
 	log.Println("Server started on port 8080")
 	if err := http.ListenAndServe(":8080", handler); err != nil {
