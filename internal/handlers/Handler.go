@@ -199,3 +199,16 @@ func (h *Handler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error encoding response ", err)
 	}
 }
+func (h *Handler) CancelBooking(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	commandTag, err := h.DB.Exec(context.Background(), "DELETE FROM bookings WHERE id = $1", id)
+	if err != nil {
+		http.Error(w, "DB Error", http.StatusInternalServerError)
+		return
+	}
+	if commandTag.RowsAffected() == 0 {
+		http.Error(w, "Booking not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
